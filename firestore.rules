@@ -1,0 +1,53 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Admin = listed in tenants/{tenantId}/admins/{uid} OR tenant.adminEmail matches signed-in email
+    function isAdmin(tenantId) {
+      return request.auth != null && (
+        exists(/databases/$(database)/documents/tenants/$(tenantId)/admins/$(request.auth.uid))
+        || get(/databases/$(database)/documents/tenants/$(tenantId)).data.adminEmail == request.auth.token.email
+      );
+    }
+
+    // Root-level collections (app uses these with tenantId field)
+    match /staff/{staffId} {
+      allow read: if request.auth != null && resource.data.tenantId != null && isAdmin(resource.data.tenantId);
+      allow write: if request.auth != null && request.resource.data.tenantId != null && isAdmin(request.resource.data.tenantId);
+    }
+    match /services/{serviceId} {
+      allow read: if request.auth != null && resource.data.tenantId != null && isAdmin(resource.data.tenantId);
+      allow write: if request.auth != null && request.resource.data.tenantId != null && isAdmin(request.resource.data.tenantId);
+    }
+    match /bookings/{bookingId} {
+      allow read: if request.auth != null && (isAdmin(resource.data.tenantId) || resource.data.customerId == request.auth.uid);
+      allow create: if request.auth != null && (isAdmin(request.resource.data.tenantId) || request.resource.data.customerId == request.auth.uid);
+      allow update, delete: if request.auth != null && (isAdmin(resource.data.tenantId) || resource.data.customerId == request.auth.uid);
+    }
+    match /customers/{customerId} {
+      allow read, write: if request.auth != null && (isAdmin(resource.data.tenantId) || request.auth.uid == customerId);
+    }
+
+    match /tenants/{tenantId} {
+      allow read, write: if isAdmin(tenantId);
+      match /services/{serviceId} {
+        allow read: if true;
+        allow write: if isAdmin(tenantId);
+      }
+      match /staff/{staffId} {
+        allow read: if true;
+        allow write: if isAdmin(tenantId);
+      }
+      match /bookings/{bookingId} {
+        allow read: if isAdmin(tenantId) || (request.auth != null && resource.data.customerId == request.auth.uid);
+        allow create: if isAdmin(tenantId) || (request.auth != null && request.resource.data.customerId == request.auth.uid);
+        allow update, delete: if isAdmin(tenantId) || (request.auth != null && resource.data.customerId == request.auth.uid);
+      }
+      match /customers/{customerId} {
+        allow read, write: if isAdmin(tenantId) || request.auth.uid == customerId;
+      }
+      match /admins/{adminId} {
+        allow read, write: if isAdmin(tenantId);
+      }
+    }
+  }
+}

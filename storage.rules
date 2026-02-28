@@ -1,0 +1,27 @@
+rules_version = '2';
+service firebase.storage {
+  match /b/{bucket}/o {
+    match /tenants/{tenantId}/services/{fileName} {
+      allow read: if true;
+      allow create, update: if request.auth != null
+        && request.auth.token.adminTenantIds != null
+        && tenantId in request.auth.token.adminTenantIds
+        && request.resource.size <= 5 * 1024 * 1024
+        && request.resource.contentType.matches('image/(jpeg|png|webp)');
+      allow delete: if request.auth != null
+        && request.auth.token.adminTenantIds != null
+        && tenantId in request.auth.token.adminTenantIds;
+    }
+    match /tenants/{tenantId}/staff/{fileName} {
+      allow read: if true;
+      allow create, update: if request.auth != null
+        && request.auth.token.adminTenantIds != null
+        && tenantId in request.auth.token.adminTenantIds
+        && request.resource.size <= 5 * 1024 * 1024
+        && request.resource.contentType.matches('image/(jpeg|png|webp)');
+      allow delete: if request.auth != null
+        && request.auth.token.adminTenantIds != null
+        && tenantId in request.auth.token.adminTenantIds;
+    }
+  }
+}
